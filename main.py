@@ -3,8 +3,11 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from sklearn.datasets import load_sample_image
 from sklearn.utils import shuffle
 from skimage import io
+from skimage import img_as_float64
+from sklearn.decomposition import PCA
 import cv2
 
 
@@ -17,6 +20,13 @@ def reconstruct_image(cluster_centers, labels, w, h):
             image[i][j] = cluster_centers[labels[label_index]]
             label_index += 1
     return image
+
+def convert_3d_matrix_to_2d(matrix):
+    w, h, d = tuple(matrix.shape)
+    assert d == 3
+    twoD_matrix = np.reshape(converted_image, (w*h, d))
+    return twoD_matrix
+
 # ============================
 # EXTRACT FRAMES FROM VIDEO
 # ============================
@@ -39,25 +49,30 @@ def reconstruct_image(cluster_centers, labels, w, h):
 # COLOR QUANTIZATION
 # ============================
 
-
 # === LOAD IMAGE ===
-image = io.imread('./images/img0.jpg')
+imageCollection = io.MultiImage('./images/*.jpg')
+
+tmp_array = []
 
 # === CONVERT 8 BIT TO FLOAT ===
-image = np.array(image, dtype=np.float64) / 255
-plt.imshow(image)
-plt.show()
+for image in imageCollection:
+    converted_image = img_as_float64(image)
 
-# === CONVERT IMAGE INTO 2D MATRIX FOR MANIPULATION ===
-w, h, d = original_shape = tuple(image.shape)
-assert d == 3
-image_array = np.reshape(image, (w*h, d))
+    # === CONVERT IMAGE INTO 2D MATRIX FOR MANIPULATION ===
+    image_array = convert_3d_matrix_to_2d(converted_image)
 
-# === TRAIN MODEL TO AGGREGATE COLORS IN ORDER TO HAVE 64 DISTINCT COLORS IN IMAGE ===
-image_sample = shuffle(image_array, random_state=0)[:1000]
-n_colors = 64
-kmeans = KMeans(n_clusters=n_colors, random_state=0).fit(image_sample)
-labels = kmeans.predict(image_array)
+    # === TRAIN MODEL TO AGGREGATE COLORS IN ORDER TO HAVE 64 DISTINCT COLORS IN IMAGE ===
+    image_sample = shuffle(image_array, random_state=0)[:1000]
+    n_colors = 64
+    kmeans = KMeans(n_clusters=n_colors, random_state=0).fit(image_sample)
+    labels = kmeans.predict(image_array)
 
-plt.imshow(reconstruct_image(kmeans.cluster_centers_, labels, w, h))
-plt.show()
+    plt.imshow(reconstruct_image(kmeans.cluster_centers_, labels, w, h))
+    plt.show()
+    tmp_array.append(reconstruct_image(kmeans.cluster_centers_, labels, w, h))
+
+
+# images = np.stack(tmp_array, axis=0)
+# for img in images:
+#     plt.imshow(img)
+#     plt.show()
